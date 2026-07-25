@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "pocket-r2"
+version = "0.1.0"
+description = "AI agent that generates cover letters from job postings using local LLMs"
+requires-python = ">=3.10"
+dependencies = [
+    "ollama>=0.4.0",
+    "requests>=2.31.0",
+    "beautifulsoup4>=4.12.0",
+    "playwright>=1.40.0",
+    "pyyaml>=6.0",
+]
+
+[project.scripts]
+pocket-r2 = "pocket_r2.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["pocket_r2*"]
