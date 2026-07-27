@@ -1,2 +1,3 @@
 model: qwen3-coder-next
 ollama_host: http://localhost:11434
+output_dir: output
