@@ -53,7 +53,7 @@ def main(argv: list[str] | None = None) -> None:
     args = parse_args(argv)
     config = load_config(args.config)
 
-    model = args.model or config.get("model", "hemanth/coverletter")
+    model = args.model or config.get("model", "qwen3-coder-next:latest")
     host = config.get("ollama_host")
 
     if not args.resume.exists():

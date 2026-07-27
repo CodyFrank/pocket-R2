@@ -1,2 +1,2 @@
-model: hemanth/coverletter
+model: qwen3-coder-next
 ollama_host: http://localhost:11434

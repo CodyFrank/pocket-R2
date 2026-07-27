@@ -5,7 +5,7 @@ import ollama
 
 def generate_cover_letter(
     messages: list[dict],
-    model: str = "hemanth/coverletter",
+    model: str = "",
     host: str | None = None,
 ) -> str:
     client = ollama.Client(host=host) if host else ollama.Client()
