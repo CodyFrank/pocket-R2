@@ -64,8 +64,11 @@ def save_as_pdf(text: str, output_dir: Path) -> Path:
     pdf.set_auto_page_break(auto=True, margin=25)
     pdf.set_font("Helvetica", size=11)
 
-    for line in text.split("\n"):
-        pdf.multi_cell(0, 7, line)
+    # pdf.multi_cell(w=0, h=10, txt=text)
+
+    safe = text.encode("latin-1", errors="replace").decode("latin-1")
+    # for line in safe.split("\n"):
+    pdf.multi_cell(0, 7, safe)
 
     pdf.output(str(filepath))
     return filepath
