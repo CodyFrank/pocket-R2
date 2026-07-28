@@ -1,4 +1,6 @@
-SYSTEM_PROMPT = """\
+from __future__ import annotations
+
+COVER_LETTER_SYSTEM = """\
 You are an expert technical recruiter and professional career writer.
 
 Your task is to write a customized cover letter using ONLY information found in
@@ -39,17 +41,35 @@ If the candidate lacks one or more requested qualifications:
 
 Output only the completed cover letter.
 """
-# SYSTEM_PROMPT = """\
-# You are a professional cover letter writer. Given a job posting and a candidate's \
-# resume, write a tailored cover letter that:
-#
-# - Addresses the specific role and company
-# - Highlights directly relevant experience from the resume
-# - Matches the tone and language of the job posting
-# - Is concise (250-400 words)
-# - Avoids generic filler phrases
-# - Does not repeat the resume verbatim
-# """
+
+RESUME_SYSTEM = """\
+You are an expert resume writer and career coach.
+
+Your task is to rewrite the candidate's resume to be more compelling and
+tailored to a specific job posting. Use the candidate's original resume as
+the source of truth.
+
+You may draw from an additional skills list to incorporate relevant skills
+that the candidate possesses but may not have listed on their current resume.
+Only use skills from that list — do not invent anything.
+
+Goals:
+- Reorganize and rephrase content to highlight the most relevant experience.
+- Weave in matching skills from the additional skills list where appropriate.
+- Use strong action verbs and quantify achievements where possible.
+- Keep descriptions concise and impactful.
+- Preserve the overall structure (chronological or functional).
+- Match the tone to the industry and role.
+
+Do NOT:
+- Invent experience, job titles, dates, or companies.
+- Add projects, certifications, or education that do not exist in the original resume.
+- Inflate job titles or tenure.
+- Exaggerate the scope of responsibilities.
+- Include any information not supported by the original resume or skills list.
+
+Output only the completed resume in plain text.
+"""
 
 USER_PROMPT = """\
 ## Job Posting
@@ -59,16 +79,36 @@ USER_PROMPT = """\
 ## Candidate Resume
 
 {resume_text}
+"""
 
-Write a cover letter for this position.\
+SKILLS_SECTION = """
+
+## Additional Skills
+
+{skills_text}
 """
 
 
-def build_messages(job_text: str, resume_text: str) -> list[dict]:
+def format_user_prompt(job_text: str, resume_text: str, skills_text: str | None = None) -> str:
+    prompt = USER_PROMPT.format(job_text=job_text, resume_text=resume_text)
+    if skills_text:
+        prompt += SKILLS_SECTION.format(skills_text=skills_text)
+    return prompt
+
+
+def build_cover_letter_messages(
+    job_text: str, resume_text: str, skills_text: str | None = None,
+) -> list[dict]:
     return [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": USER_PROMPT.format(
-            job_text=job_text,
-            resume_text=resume_text,
-        )},
+        {"role": "system", "content": COVER_LETTER_SYSTEM},
+        {"role": "user", "content": format_user_prompt(job_text, resume_text, skills_text)},
+    ]
+
+
+def build_resume_messages(
+    job_text: str, resume_text: str, skills_text: str | None = None,
+) -> list[dict]:
+    return [
+        {"role": "system", "content": RESUME_SYSTEM},
+        {"role": "user", "content": format_user_prompt(job_text, resume_text, skills_text)},
     ]

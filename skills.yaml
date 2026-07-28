@@ -1,0 +1,7 @@
+# Additional skills not on your resume
+# These are injected into the LLM prompts to help tailor cover letters and resumes.
+# Remove or add categories as needed.
+
+technical: []
+soft: []
+certifications: []

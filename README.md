@@ -1,7 +1,7 @@
 
 # pocket-R2
 
-AI cover letter generator that runs entirely on local LLMs via Ollama.
+AI cover letter and resume generator that runs entirely on local LLMs via Ollama.
 
 ## Prerequisites
 
@@ -23,20 +23,44 @@ playwright install chromium   # required for JS-heavy job sites
 ## Usage
 
 ```bash
-# From a job posting URL
+# Generate both cover letter and tailored resume
 python -m pocket_r2 --url "https://..." --resume resume.txt
 
 # From pasted text
 python -m pocket_r2 --text "Software Engineer at Acme Corp..." --resume resume.txt
 
-# Print to terminal instead of saving PDF
+# Resume only (skip cover letter)
+python -m pocket_r2 --url "https://..." --resume resume.txt --no-cover-letter
+
+# Cover letter only (skip resume)
+python -m pocket_r2 --url "https://..." --resume resume.txt --no-resume
+
+# Print to terminal instead of saving PDFs
 python -m pocket_r2 --url "https://..." --resume resume.txt --stdout
 
 # Override model
 python -m pocket_r2 --url "https://..." --resume resume.txt --model mistral
 ```
 
-Cover letters are saved as PDFs to the `output/` directory by default (configurable in `config.yaml`).
+Cover letters and tailored resumes are saved as PDFs to the `output/` directory by default (configurable in `config.yaml`).
+
+## Extra Skills
+
+Create `skills.yaml` in the project root with skills not on your current resume:
+
+```yaml
+technical:
+  - Kubernetes
+  - Terraform
+  - CI/CD pipelines
+soft:
+  - Team leadership
+  - Cross-functional collaboration
+certifications:
+  - AWS Solutions Architect
+```
+
+These are injected into the LLM prompts to produce more tailored results.
 
 ## Configuration
 
@@ -46,6 +70,8 @@ Edit `config.yaml` to change defaults:
 model: qwen3-coder-next
 ollama_host: http://localhost:11434
 output_dir: output
+resume_output_dir: output
+skills_file: skills.yaml
 ```
 
 ## License

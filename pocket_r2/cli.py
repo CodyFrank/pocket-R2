@@ -8,8 +8,8 @@ from pathlib import Path
 import yaml
 from fpdf import FPDF
 
-from pocket_r2.llm import generate_cover_letter
-from pocket_r2.prompts import build_messages
+from pocket_r2.llm import generate
+from pocket_r2.prompts import build_cover_letter_messages, build_resume_messages
 from pocket_r2.scraper import get_job_text
 
 DEFAULT_CONFIG_PATH = Path("config.yaml")
@@ -23,10 +23,25 @@ def load_config(path: Path) -> dict:
         return yaml.safe_load(f) or {}
 
 
+def load_skills(path: Path) -> str | None:
+    if not path.exists():
+        return None
+    with open(path) as f:
+        data = yaml.safe_load(f) or {}
+    lines = []
+    for category, items in data.items():
+        if items:
+            lines.append(f"### {category.replace('_', ' ').title()}")
+            lines.extend(f"- {item}" for item in items)
+            lines.append("")
+    text = "\n".join(lines).strip()
+    return text if text else None
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="pocket-r2",
-        description="Generate a cover letter from a job posting using a local LLM.",
+        description="Generate a cover letter and/or tailored resume from a job posting using a local LLM.",
     )
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument("--url", help="URL of the job posting")
@@ -42,21 +57,28 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--stdout", action="store_true",
-        help="Print cover letter to terminal instead of saving PDF",
+        help="Print output to terminal instead of saving PDFs",
     )
     parser.add_argument(
         "--config", type=Path, default=DEFAULT_CONFIG_PATH,
         help="Path to config file (default: ./config.yaml)",
     )
+    parser.add_argument(
+        "--no-resume", action="store_true",
+        help="Skip resume tailoring",
+    )
+    parser.add_argument(
+        "--no-cover-letter", action="store_true",
+        help="Skip cover letter generation",
+    )
     return parser.parse_args(argv)
 
 
-def save_as_pdf(text: str, output_dir: Path) -> Path:
-    """Save cover letter text as a PDF. Returns the path to the saved file."""
+def save_as_pdf(text: str, output_dir: Path, prefix: str = "cover_letter") -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"cover_letter_{timestamp}.pdf"
+    filename = f"{prefix}_{timestamp}.pdf"
     filepath = output_dir / filename
 
     pdf = FPDF()
@@ -64,10 +86,7 @@ def save_as_pdf(text: str, output_dir: Path) -> Path:
     pdf.set_auto_page_break(auto=True, margin=25)
     pdf.set_font("Helvetica", size=11)
 
-    # pdf.multi_cell(w=0, h=10, txt=text)
-
     safe = text.encode("latin-1", errors="replace").decode("latin-1")
-    # for line in safe.split("\n"):
     pdf.multi_cell(0, 7, safe)
 
     pdf.output(str(filepath))
@@ -78,9 +97,15 @@ def main(argv: list[str] | None = None) -> None:
     args = parse_args(argv)
     config = load_config(args.config)
 
+    if args.no_resume and args.no_cover_letter:
+        print("Both --no-resume and --no-cover-letter set — nothing to generate.", file=sys.stderr)
+        raise SystemExit(1)
+
     model = args.model or config.get("model", "qwen3-coder-next")
     host = config.get("ollama_host")
     output_dir = Path(config.get("output_dir", "output"))
+    resume_output_dir = Path(config.get("resume_output_dir", "output"))
+    skills_file = Path(config.get("skills_file", "skills.yaml"))
 
     if not args.resume.exists():
         print(f"Resume file not found: {args.resume}", file=sys.stderr)
@@ -88,18 +113,37 @@ def main(argv: list[str] | None = None) -> None:
 
     job_text = get_job_text(url=args.url, text=args.text)
     resume_text = args.resume.read_text().strip()
+    skills_text = load_skills(skills_file)
+
+    if skills_text:
+        print(f"Loaded skills from {skills_file}", file=sys.stderr)
 
     print(f"Using model: {model}", file=sys.stderr)
-    messages = build_messages(job_text, resume_text)
 
-    print("Generating cover letter...", file=sys.stderr)
-    cover_letter = generate_cover_letter(messages, model=model, host=host)
+    if not args.no_cover_letter:
+        print("Generating cover letter...", file=sys.stderr)
+        cover_messages = build_cover_letter_messages(job_text, resume_text, skills_text)
+        cover_letter = generate(cover_messages, model=model, host=host)
 
-    if args.stdout:
-        print(cover_letter)
-    else:
-        filepath = save_as_pdf(cover_letter, output_dir)
-        print(f"Saved to {filepath}", file=sys.stderr)
+        if args.stdout:
+            print("--- Cover Letter ---")
+            print(cover_letter)
+            print()
+        else:
+            filepath = save_as_pdf(cover_letter, output_dir, "cover_letter")
+            print(f"Cover letter saved to {filepath}", file=sys.stderr)
+
+    if not args.no_resume:
+        print("Generating tailored resume...", file=sys.stderr)
+        resume_messages = build_resume_messages(job_text, resume_text, skills_text)
+        tailored_resume = generate(resume_messages, model=model, host=host)
+
+        if args.stdout:
+            print("--- Tailored Resume ---")
+            print(tailored_resume)
+        else:
+            filepath = save_as_pdf(tailored_resume, resume_output_dir, "resume")
+            print(f"Tailored resume saved to {filepath}", file=sys.stderr)
 
 
 if __name__ == "__main__":
