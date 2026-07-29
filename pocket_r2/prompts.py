@@ -49,7 +49,7 @@ If the candidate lacks one or more requested qualifications:
 - Do not mention the missing qualifications.
 - Instead, emphasize the closest relevant experience and transferable skills.
 
-Output only the completed cover letter.
+Output only the completed cover letter so the output can be used to generate a PDF directly
 """
 
 RESUME_SYSTEM = """
