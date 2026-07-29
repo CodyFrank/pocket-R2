@@ -2,6 +2,6 @@
 # These are injected into the LLM prompts to help tailor cover letters and resumes.
 # Remove or add categories as needed.
 
-technical: []
-soft: []
+technical: [python, aws, sql]
+soft: ["leadership"]
 certifications: []

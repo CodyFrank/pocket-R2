@@ -6,9 +6,9 @@ from datetime import datetime
 from pathlib import Path
 
 import yaml
-from fpdf import FPDF
 
 from pocket_r2.llm import generate
+from pocket_r2.pdf import CoverLetterPDF, ResumePDF
 from pocket_r2.prompts import build_cover_letter_messages, build_resume_messages
 from pocket_r2.scraper import get_job_text
 
@@ -74,21 +74,24 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def save_as_pdf(text: str, output_dir: Path, prefix: str = "cover_letter") -> Path:
+def _timestamped_path(output_dir: Path, prefix: str) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return output_dir / f"{prefix}_{ts}.pdf"
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"{prefix}_{timestamp}.pdf"
-    filepath = output_dir / filename
 
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_auto_page_break(auto=True, margin=25)
-    pdf.set_font("Helvetica", size=11)
+def save_cover_letter_pdf(text: str, output_dir: Path) -> Path:
+    filepath = _timestamped_path(output_dir, "cover_letter")
+    pdf = CoverLetterPDF()
+    pdf.render(text)
+    pdf.output(str(filepath))
+    return filepath
 
-    safe = text.encode("latin-1", errors="replace").decode("latin-1")
-    pdf.multi_cell(0, 7, safe)
 
+def save_resume_pdf(text: str, output_dir: Path) -> Path:
+    filepath = _timestamped_path(output_dir, "resume")
+    pdf = ResumePDF()
+    pdf.render(text)
     pdf.output(str(filepath))
     return filepath
 
@@ -130,7 +133,7 @@ def main(argv: list[str] | None = None) -> None:
             print(cover_letter)
             print()
         else:
-            filepath = save_as_pdf(cover_letter, output_dir, "cover_letter")
+            filepath = save_cover_letter_pdf(cover_letter, output_dir)
             print(f"Cover letter saved to {filepath}", file=sys.stderr)
 
     if not args.no_resume:
@@ -142,7 +145,7 @@ def main(argv: list[str] | None = None) -> None:
             print("--- Tailored Resume ---")
             print(tailored_resume)
         else:
-            filepath = save_as_pdf(tailored_resume, resume_output_dir, "resume")
+            filepath = save_resume_pdf(tailored_resume, resume_output_dir)
             print(f"Tailored resume saved to {filepath}", file=sys.stderr)
 
 

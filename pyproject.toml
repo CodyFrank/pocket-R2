@@ -21,3 +21,6 @@ pocket-r2 = "pocket_r2.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["pocket_r2*"]
+
+[tool.setuptools.package-data]
+pocket_r2 = ["fonts/*.ttf"]

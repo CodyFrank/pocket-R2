@@ -293,9 +293,9 @@ Do not include explanations, notes, markdown, or commentary.
 """
 
 
-def format_user_prompt(job_text: str, resume_text: str, skills_text: str | None = None, user_prompt: str | USER_PROMPT) -> str:
-    prompt = USER_PROMPT.format(job_text=job_text, resume_text=resume_text)
-    if skills_text:
+def format_user_prompt(job_text: str, resume_text: str, skills_text: str | None = None, user_prompt: str = USER_PROMPT) -> str:
+    prompt = user_prompt.format(job_text=job_text, resume_text=resume_text, skills_text=skills_text or "")
+    if skills_text and "{skills_text}" not in user_prompt:
         prompt += SKILLS_SECTION.format(skills_text=skills_text)
     return prompt
 
