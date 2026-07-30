@@ -48,27 +48,35 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     source.add_argument("--text", help="Raw text of the job posting")
 
     parser.add_argument(
-        "--resume", type=Path, default=DEFAULT_RESUME_PATH,
+        "--resume",
+        type=Path,
+        default=DEFAULT_RESUME_PATH,
         help="Path to resume file (default: ./resume.txt)",
     )
     parser.add_argument(
-        "--model", default=None,
+        "--model",
+        default=None,
         help="Ollama model to use (overrides config.yaml)",
     )
     parser.add_argument(
-        "--stdout", action="store_true",
+        "--stdout",
+        action="store_true",
         help="Print output to terminal instead of saving PDFs",
     )
     parser.add_argument(
-        "--config", type=Path, default=DEFAULT_CONFIG_PATH,
+        "--config",
+        type=Path,
+        default=DEFAULT_CONFIG_PATH,
         help="Path to config file (default: ./config.yaml)",
     )
     parser.add_argument(
-        "--no-resume", action="store_true",
+        "--no-resume",
+        action="store_true",
         help="Skip resume tailoring",
     )
     parser.add_argument(
-        "--no-cover-letter", action="store_true",
+        "--no-cover-letter",
+        action="store_true",
         help="Skip cover letter generation",
     )
     return parser.parse_args(argv)
@@ -101,7 +109,10 @@ def main(argv: list[str] | None = None) -> None:
     config = load_config(args.config)
 
     if args.no_resume and args.no_cover_letter:
-        print("Both --no-resume and --no-cover-letter set — nothing to generate.", file=sys.stderr)
+        print(
+            "Both --no-resume and --no-cover-letter set — nothing to generate.",
+            file=sys.stderr,
+        )
         raise SystemExit(1)
 
     model = args.model or config.get("model", "qwen3-coder-next")
