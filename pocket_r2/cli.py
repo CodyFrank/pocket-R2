@@ -56,7 +56,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--model",
         default=None,
-        help="Ollama model to use (overrides config.yaml)",
+        help="Model to use (overrides config.yaml)",
+    )
+    parser.add_argument(
+        "--provider",
+        default=None,
+        choices=["ollama", "openai", "anthropic"],
+        help="LLM provider (overrides config.yaml)",
     )
     parser.add_argument(
         "--stdout",
@@ -116,6 +122,7 @@ def main(argv: list[str] | None = None) -> None:
         raise SystemExit(1)
 
     model = args.model or config.get("model", "qwen3-coder-next")
+    provider = args.provider or config.get("provider", "ollama")
     host = config.get("ollama_host")
     output_dir = Path(config.get("output_dir", "output"))
     resume_output_dir = Path(config.get("resume_output_dir", "output"))
@@ -132,12 +139,12 @@ def main(argv: list[str] | None = None) -> None:
     if skills_text:
         print(f"Loaded skills from {skills_file}", file=sys.stderr)
 
-    print(f"Using model: {model}", file=sys.stderr)
+    print(f"Using model: {model} ({provider})", file=sys.stderr)
 
     if not args.no_cover_letter:
         print("Generating cover letter...", file=sys.stderr)
         cover_messages = build_cover_letter_messages(job_text, resume_text, skills_text)
-        cover_letter = generate(cover_messages, model=model, host=host)
+        cover_letter = generate(cover_messages, model=model, provider=provider, host=host)
 
         if args.stdout:
             print("--- Cover Letter ---")
@@ -150,7 +157,7 @@ def main(argv: list[str] | None = None) -> None:
     if not args.no_resume:
         print("Generating tailored resume...", file=sys.stderr)
         resume_messages = build_resume_messages(job_text, resume_text, skills_text)
-        tailored_resume = generate(resume_messages, model=model, host=host)
+        tailored_resume = generate(resume_messages, model=model, provider=provider, host=host)
 
         if args.stdout:
             print("--- Tailored Resume ---")

@@ -1,4 +1,5 @@
-model: gemma4:31b
+provider: ollama
+model: gemma3:4b
 ollama_host: http://localhost:11434
 output_dir: output
 resume_output_dir: output

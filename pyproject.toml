@@ -9,6 +9,8 @@ description = "AI agent that generates cover letters from job postings using loc
 requires-python = ">=3.10"
 dependencies = [
     "ollama>=0.4.0",
+    "openai>=1.0.0",
+    "anthropic>=0.40.0",
     "requests>=2.31.0",
     "beautifulsoup4>=4.12.0",
     "playwright>=1.40.0",
