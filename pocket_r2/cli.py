@@ -110,6 +110,14 @@ def save_resume_pdf(text: str, output_dir: Path) -> Path:
     return filepath
 
 
+def detect_injection(output: str, resume_text: str) -> bool:
+    suspicious = [
+        "ignore previous", "system override", "you are now",
+        "forget everything", "override mode",
+    ]
+    return any(p in output.lower() for p in suspicious)
+
+
 def main(argv: list[str] | None = None) -> None:
     args = parse_args(argv)
     config = load_config(args.config)
@@ -146,6 +154,12 @@ def main(argv: list[str] | None = None) -> None:
         cover_messages = build_cover_letter_messages(job_text, resume_text, skills_text)
         cover_letter = generate(cover_messages, model=model, provider=provider, host=host)
 
+        if detect_injection(cover_letter, resume_text):
+            print(
+                "WARNING: Possible prompt injection detected in cover letter.",
+                file=sys.stderr,
+            )
+
         if args.stdout:
             print("--- Cover Letter ---")
             print(cover_letter)
@@ -158,6 +172,12 @@ def main(argv: list[str] | None = None) -> None:
         print("Generating tailored resume...", file=sys.stderr)
         resume_messages = build_resume_messages(job_text, resume_text, skills_text)
         tailored_resume = generate(resume_messages, model=model, provider=provider, host=host)
+
+        if detect_injection(tailored_resume, resume_text):
+            print(
+                "WARNING: Possible prompt injection detected in tailored resume.",
+                file=sys.stderr,
+            )
 
         if args.stdout:
             print("--- Tailored Resume ---")
