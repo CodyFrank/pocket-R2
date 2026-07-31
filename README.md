@@ -44,6 +44,12 @@ python -m pocket_r2 --url "https://..." --resume resume.txt --model mistral
 
 Cover letters and tailored resumes are saved as PDFs to the `output/` directory by default (configurable in `config.yaml`).
 
+## SSRF Protection
+
+By default, `--url` fetches are limited to public internet addresses. URLs that resolve to private/reserved IPs (localhost, RFC1918, link-local, cloud metadata like `169.254.169.254`) are refused, redirects are validated at each hop, and the Playwright browser blocks requests to non-public addresses. This prevents Server-Side Request Forgery against internal services.
+
+To allow fetching from private networks (unsafe), set `allow_private_urls: true` in `config.yaml` or pass `--allow-private-urls`. If a legitimate site is blocked, you can paste the posting text with `--text` instead.
+
 ## Extra Skills
 
 Create `skills.yaml` in the project root with skills not on your current resume:

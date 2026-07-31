@@ -4,3 +4,4 @@ ollama_host: http://localhost:11434
 output_dir: output
 resume_output_dir: output
 skills_file: skills.yaml
+allow_private_urls: false

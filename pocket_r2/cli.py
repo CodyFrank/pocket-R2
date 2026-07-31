@@ -85,6 +85,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Skip cover letter generation",
     )
+    parser.add_argument(
+        "--allow-private-urls",
+        action="store_true",
+        help="Allow fetching URLs that resolve to private/reserved addresses (SSRF risk, default: off)",
+    )
     return parser.parse_args(argv)
 
 
@@ -135,12 +140,15 @@ def main(argv: list[str] | None = None) -> None:
     output_dir = Path(config.get("output_dir", "output"))
     resume_output_dir = Path(config.get("resume_output_dir", "output"))
     skills_file = Path(config.get("skills_file", "skills.yaml"))
+    allow_private_urls = args.allow_private_urls or config.get("allow_private_urls", False)
 
     if not args.resume.exists():
         print(f"Resume file not found: {args.resume}", file=sys.stderr)
         raise SystemExit(1)
 
-    job_text = get_job_text(url=args.url, text=args.text)
+    job_text = get_job_text(
+        url=args.url, text=args.text, allow_private_urls=allow_private_urls
+    )
     resume_text = args.resume.read_text().strip()
     skills_text = load_skills(skills_file)
 
