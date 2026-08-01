@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import os
+from pocket_r2 import secrets
 
-_PROVIDER_CONFIGS: dict[str, tuple[str, str]] = {
-    "openai": ("OPENAI_API_KEY", "https://api.openai.com/v1"),
-    "google": ("GOOGLE_API_KEY", "https://generativelanguage.googleapis.com/v1beta/openai/"),
-    "deepseek": ("DEEPSEEK_API_KEY", "https://api.deepseek.com"),
-    "mistral": ("MISTRAL_API_KEY", "https://api.mistral.ai/v1"),
+_PROVIDER_CONFIGS: dict[str, str] = {
+    "openai": "https://api.openai.com/v1",
+    "google": "https://generativelanguage.googleapis.com/v1beta/openai/",
+    "deepseek": "https://api.deepseek.com",
+    "mistral": "https://api.mistral.ai/v1",
 }
 
 
@@ -45,11 +45,13 @@ def _generate_openai_compatible(
 ) -> str:
     from openai import OpenAI
 
-    env_var, base_url = _PROVIDER_CONFIGS[provider]
-    api_key = os.environ.get(env_var)
+    api_key = secrets.get_api_key(provider)
     if not api_key:
-        raise ValueError(f"{env_var} environment variable is not set")
-    client = OpenAI(api_key=api_key, base_url=base_url)
+        raise ValueError(
+            f"No API key configured for {provider}. "
+            f"Run: pocket-r2 keys add {provider}"
+        )
+    client = OpenAI(api_key=api_key, base_url=_PROVIDER_CONFIGS[provider])
     response = client.chat.completions.create(
         model=model,
         messages=messages,
@@ -63,10 +65,11 @@ def _generate_anthropic(
 ) -> str:
     import anthropic
 
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    api_key = secrets.get_api_key("anthropic")
     if not api_key:
         raise ValueError(
-            "ANTHROPIC_API_KEY environment variable is not set"
+            "No API key configured for anthropic. "
+            "Run: pocket-r2 keys add anthropic"
         )
 
     system_content = None

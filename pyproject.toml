@@ -18,6 +18,9 @@ dependencies = [
     "fpdf2>=2.8.0",
 ]
 
+[project.optional-dependencies]
+keyring = ["keyring>=25"]
+
 [project.scripts]
 pocket-r2 = "pocket_r2.cli:main"
 

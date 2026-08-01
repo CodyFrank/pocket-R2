@@ -7,6 +7,7 @@ from pathlib import Path
 
 import yaml
 
+from pocket_r2 import secrets
 from pocket_r2.llm import generate
 from pocket_r2.pdf import CoverLetterPDF, ResumePDF
 from pocket_r2.prompts import build_cover_letter_messages, build_resume_messages
@@ -123,7 +124,64 @@ def detect_injection(output: str, resume_text: str) -> bool:
     return any(p in output.lower() for p in suspicious)
 
 
+def keys_main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(prog="pocket-r2 keys")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    add_p = sub.add_parser("add", help="Store an API key for a provider")
+    add_p.add_argument("provider", choices=secrets.PROVIDERS)
+
+    rm_p = sub.add_parser("remove", help="Delete an API key for a provider")
+    rm_p.add_argument("provider", choices=secrets.PROVIDERS)
+
+    sub.add_parser("list", help="Show which providers have keys configured")
+    sub.add_parser("status", help="Show storage backend and configured providers")
+
+    args = parser.parse_args(argv)
+
+    if args.command == "add":
+        key = secrets.prompt_for_key(args.provider)
+        secrets.set_api_key(args.provider, key)
+        print(
+            f"Stored API key for {args.provider} "
+            f"({secrets.storage_backend()})."
+        )
+    elif args.command == "remove":
+        secrets.delete_api_key(args.provider)
+        print(f"Removed API key for {args.provider}.")
+    elif args.command == "list":
+        configured = secrets.configured_providers()
+        if configured:
+            print("Configured providers: " + ", ".join(configured))
+        else:
+            print(
+                "No API keys configured. "
+                "Run: pocket-r2 keys add <provider>"
+            )
+    elif args.command == "status":
+        print(f"Storage backend: {secrets.storage_backend()}")
+        configured = secrets.configured_providers()
+        if configured:
+            print("Configured providers: " + ", ".join(configured))
+        else:
+            print("No API keys configured.")
+
+
+def _generate_clean(
+    messages: list[dict], model: str, provider: str, host: str | None
+) -> str:
+    try:
+        return generate(messages, model=model, provider=provider, host=host)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        raise SystemExit(1) from None
+
+
 def main(argv: list[str] | None = None) -> None:
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] == "keys":
+        keys_main(argv[1:])
+        return
     args = parse_args(argv)
     config = load_config(args.config)
 
@@ -157,10 +215,17 @@ def main(argv: list[str] | None = None) -> None:
 
     print(f"Using model: {model} ({provider})", file=sys.stderr)
 
+    if provider != "ollama":
+        print(
+            f"Note: using cloud provider '{provider}' — the job posting and "
+            "your resume will be sent to that provider's servers.",
+            file=sys.stderr,
+        )
+
     if not args.no_cover_letter:
         print("Generating cover letter...", file=sys.stderr)
         cover_messages = build_cover_letter_messages(job_text, resume_text, skills_text)
-        cover_letter = generate(cover_messages, model=model, provider=provider, host=host)
+        cover_letter = _generate_clean(cover_messages, model=model, provider=provider, host=host)
 
         if detect_injection(cover_letter, resume_text):
             print(
@@ -179,7 +244,7 @@ def main(argv: list[str] | None = None) -> None:
     if not args.no_resume:
         print("Generating tailored resume...", file=sys.stderr)
         resume_messages = build_resume_messages(job_text, resume_text, skills_text)
-        tailored_resume = generate(resume_messages, model=model, provider=provider, host=host)
+        tailored_resume = _generate_clean(resume_messages, model=model, provider=provider, host=host)
 
         if detect_injection(tailored_resume, resume_text):
             print(
