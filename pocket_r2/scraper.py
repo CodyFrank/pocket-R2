@@ -3,13 +3,17 @@ from __future__ import annotations
 import ipaddress
 import socket
 import sys
+import threading
 from urllib.parse import urljoin, urlparse
 
 import requests
 from bs4 import BeautifulSoup
 
 MIN_CONTENT_LENGTH = 200
+MAX_CONTENT_BYTES = 2_000_000
+MAX_CACHE_ENTRIES = 4096
 MAX_REDIRECTS = 5
+DNS_TIMEOUT = 3.0
 _REDIRECT_CODES = (301, 302, 303, 307, 308)
 
 _HEADERS = {
@@ -38,6 +42,13 @@ class BlockedURLError(Exception):
         )
 
 
+class ContentTooLargeError(Exception):
+    def __init__(self, url: str) -> None:
+        super().__init__(
+            f"Refusing to fetch {url}: content exceeds {MAX_CONTENT_BYTES} bytes."
+        )
+
+
 _BLOCKED_HOST_CACHE: dict[str, bool] = {}
 
 
@@ -47,11 +58,22 @@ def _ip_is_blocked(ip) -> bool:
     return not ip.is_global or ip.is_multicast or ip.is_reserved
 
 
-def _resolve_host_blocked(host: str) -> bool:
-    try:
-        addrinfos = socket.getaddrinfo(host, None)
-    except socket.gaierror:
+def _resolve_host_blocked(host: str, timeout: float = DNS_TIMEOUT) -> bool:
+    """Resolve host with a timeout. Fails closed (blocked) on timeout/error."""
+    result: list = []
+
+    def _resolve() -> None:
+        try:
+            result.append(socket.getaddrinfo(host, None))
+        except socket.gaierror:
+            result.append(None)
+
+    thread = threading.Thread(target=_resolve, daemon=True)
+    thread.start()
+    thread.join(timeout=timeout)
+    if thread.is_alive():
         return True
+    addrinfos = result[0] if result else None
     if not addrinfos:
         return True
     for info in addrinfos:
@@ -75,38 +97,66 @@ def _is_blocked_url(url: str) -> bool:
         if cached is not None:
             return cached
         blocked = _resolve_host_blocked(host)
+        if len(_BLOCKED_HOST_CACHE) >= MAX_CACHE_ENTRIES:
+            _BLOCKED_HOST_CACHE.pop(next(iter(_BLOCKED_HOST_CACHE)))
         _BLOCKED_HOST_CACHE[host] = blocked
         return blocked
     return _ip_is_blocked(ip)
 
 
+def _read_limited(resp, max_bytes: int = MAX_CONTENT_BYTES) -> bytes:
+    """Read a streaming response, aborting (raising) once it exceeds max_bytes."""
+    content_length = resp.headers.get("Content-Length")
+    if content_length is not None:
+        try:
+            if int(content_length) > max_bytes:
+                raise ContentTooLargeError(resp.url)
+        except ValueError:
+            pass
+    chunks: list[bytes] = []
+    size = 0
+    for chunk in resp.iter_content(chunk_size=65536):
+        if not chunk:
+            continue
+        size += len(chunk)
+        if size > max_bytes:
+            raise ContentTooLargeError(resp.url)
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
 def fetch_static(url: str, allow_private_urls: bool = False) -> str | None:
     """Fetch page with requests + BeautifulSoup. Returns extracted text or None."""
     current = url
+    body: bytes | None = None
+    encoding = "utf-8"
     try:
         for _ in range(MAX_REDIRECTS):
-            resp = requests.get(
+            with requests.get(
                 current,
-                timeout=15,
+                timeout=(3, 10),
                 headers=_HEADERS,
                 allow_redirects=False,
-            )
-            if resp.status_code in _REDIRECT_CODES:
-                location = resp.headers.get("Location")
-                if not location:
-                    return None
-                current = urljoin(current, location)
-                if not allow_private_urls and _is_blocked_url(current):
-                    raise BlockedURLError(current)
-                continue
-            break
+                stream=True,
+            ) as resp:
+                if resp.status_code in _REDIRECT_CODES:
+                    location = resp.headers.get("Location")
+                    if not location:
+                        return None
+                    current = urljoin(current, location)
+                    if not allow_private_urls and _is_blocked_url(current):
+                        raise BlockedURLError(current)
+                    continue
+                resp.raise_for_status()
+                body = _read_limited(resp)
+                encoding = resp.encoding or "utf-8"
+                break
         else:
             return None
-        resp.raise_for_status()
     except requests.RequestException:
         return None
 
-    soup = BeautifulSoup(resp.text, "html.parser")
+    soup = BeautifulSoup(body.decode(encoding, errors="replace"), "html.parser")
 
     for tag in soup(["script", "style", "nav", "footer", "header"]):
         tag.decompose()
@@ -144,6 +194,8 @@ def fetch_with_playwright(url: str, allow_private_urls: bool = False) -> str | N
             page.goto(url, wait_until="networkidle", timeout=30000)
             content = page.content()
             browser.close()
+            if len(content.encode("utf-8")) > MAX_CONTENT_BYTES:
+                raise ContentTooLargeError(url)
     except Exception:
         return None
 
@@ -166,6 +218,8 @@ def fetch_job_posting(url: str, allow_private_urls: bool = False) -> str:
         text = fetch_static(url, allow_private_urls)
     except BlockedURLError as exc:
         raise SystemExit(str(exc))
+    except ContentTooLargeError as exc:
+        raise SystemExit(_content_too_large_message(exc))
 
     if text:
         print("Fetched via static request.", file=sys.stderr)
@@ -176,6 +230,8 @@ def fetch_job_posting(url: str, allow_private_urls: bool = False) -> str:
         text = fetch_with_playwright(url, allow_private_urls)
     except BlockedURLError as exc:
         raise SystemExit(str(exc))
+    except ContentTooLargeError as exc:
+        raise SystemExit(_content_too_large_message(exc))
 
     if text:
         print("Fetched via Playwright.", file=sys.stderr)
@@ -183,6 +239,13 @@ def fetch_job_posting(url: str, allow_private_urls: bool = False) -> str:
 
     raise SystemExit(
         "Could not extract content from the URL.\n"
+        "Try copying the job posting text and using --text instead."
+    )
+
+
+def _content_too_large_message(exc: ContentTooLargeError) -> str:
+    return (
+        f"{exc}\n"
         "Try copying the job posting text and using --text instead."
     )
 

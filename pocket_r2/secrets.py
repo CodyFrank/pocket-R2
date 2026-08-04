@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import getpass
 import os
+import tempfile
 from pathlib import Path
 
 import yaml
@@ -16,19 +17,46 @@ PROVIDERS = ["openai", "anthropic", "google", "deepseek", "mistral"]
 def _load_credentials_file() -> dict:
     if not CREDENTIALS_FILE.exists():
         return {}
+    try:
+        if CREDENTIALS_FILE.stat().st_mode & 0o077:
+            os.chmod(CREDENTIALS_FILE, 0o600)
+    except OSError:
+        pass
     return yaml.safe_load(CREDENTIALS_FILE.read_text()) or {}
 
 
-def _ensure_credentials_file() -> None:
-    CREDENTIALS_DIR.mkdir(parents=True, exist_ok=True)
+def _ensure_credentials_dir() -> None:
+    os.makedirs(CREDENTIALS_DIR, mode=0o700, exist_ok=True)
     os.chmod(CREDENTIALS_DIR, 0o700)
-    CREDENTIALS_FILE.touch(exist_ok=True)
-    os.chmod(CREDENTIALS_FILE, 0o600)
 
 
 def _write_credentials_file(data: dict) -> None:
-    _ensure_credentials_file()
-    CREDENTIALS_FILE.write_text(yaml.safe_dump(data, sort_keys=True))
+    """Atomically write credentials with 0600 permissions (umask-proof)."""
+    _ensure_credentials_dir()
+    fd, tmp_path = tempfile.mkstemp(dir=CREDENTIALS_DIR, prefix=".creds-")
+    try:
+        os.fchmod(fd, 0o600)
+        os.write(fd, yaml.safe_dump(data, sort_keys=True).encode("utf-8"))
+        os.fsync(fd)
+    except Exception:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
+    os.close(fd)
+    try:
+        os.replace(tmp_path, CREDENTIALS_FILE)
+    except Exception:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
     os.chmod(CREDENTIALS_FILE, 0o600)
 
 

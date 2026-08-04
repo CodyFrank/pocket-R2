@@ -48,7 +48,21 @@ Cover letters and tailored resumes are saved as PDFs to the `output/` directory 
 
 By default, `--url` fetches are limited to public internet addresses. URLs that resolve to private/reserved IPs (localhost, RFC1918, link-local, cloud metadata like `169.254.169.254`) are refused, redirects are validated at each hop, and the Playwright browser blocks requests to non-public addresses. This prevents Server-Side Request Forgery against internal services.
 
+Additional resource limits:
+- DNS resolution has a 3-second timeout and fails closed (a host that can't be verified is refused).
+- Responses larger than 2 MB are refused on both the static and Playwright fetch paths.
+
 To allow fetching from private networks (unsafe), set `allow_private_urls: true` in `config.yaml` or pass `--allow-private-urls`. If a legitimate site is blocked, you can paste the posting text with `--text` instead.
+
+## Prompt Injection Protection
+
+Job postings, resumes, and skill lists are treated as data inputs by the prompt system. Generated output is additionally checked for injection:
+
+- A deterministic check flags contact info/URLs that appear in the output but not in the resume, plus common injection phrasing.
+- An LLM-based validator reviews the draft for fabricated facts, embedded instructions, and unauthorized content. If flagged, the document is regenerated once with a hardened prompt.
+- If the regenerated draft is still flagged, a warning is printed but the output is saved so your workflow isn't blocked — review it before sending.
+
+Disable the check with `--no-injection-check` or set `prompt_injection_check: false` in `config.yaml` (not recommended).
 
 ## API Keys & Privacy
 
@@ -92,7 +106,11 @@ ollama_host: http://localhost:11434
 output_dir: output
 resume_output_dir: output
 skills_file: skills.yaml
+allow_private_urls: false
+prompt_injection_check: true
 ```
+
+Generated PDFs and your `resume.txt` are written with `0600` permissions so other local users can't read your personal data.
 
 ## License
 
