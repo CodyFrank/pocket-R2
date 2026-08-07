@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 from pocket_r2 import validation
-from pocket_r2.validation import basic_contact_check, parse_validator_json
+from pocket_r2.validation import (
+    basic_contact_check,
+    format_check,
+    parse_validator_json,
+)
 
 
 def test_no_flags_when_contact_in_resume():
@@ -11,6 +15,34 @@ def test_no_flags_when_contact_in_resume():
     )
     output = "Best, jane@example.com +1 555-123-4567 https://github.com/janedoe"
     assert basic_contact_check(output, resume) == []
+
+
+def test_format_check_clean():
+    output = (
+        "Jane Doe\njane@example.com\n\nEXPERIENCE\n"
+        "- Built production systems\n- I have improved latency"
+    )
+    assert format_check(output) == []
+
+
+def test_format_check_flags_markdown():
+    assert any("markdown" in f for f in format_check("**Bold** header"))
+    assert any("markdown" in f for f in format_check("# EXPERIENCE"))
+
+
+def test_format_check_flags_placeholder():
+    flags = format_check("Dear [Your Name]")
+    assert any("placeholder" in f for f in flags)
+
+
+def test_format_check_flags_preamble():
+    flags = format_check("Here is your tailored resume.\nJane Doe")
+    assert any("preamble" in f for f in flags)
+
+
+def test_format_check_flags_trailing_notes():
+    flags = format_check("Sincerely,\n\nExplanation of Choices & Rationale:")
+    assert any("notes" in f for f in flags)
 
 
 def test_flags_contact_not_in_resume():

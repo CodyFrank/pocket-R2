@@ -26,6 +26,33 @@ _SUSPICIOUS_KEYWORDS = (
     "reveal your instructions",
 )
 
+_FORMAT_FLAG_PATTERNS: tuple[tuple[str, re.Pattern], ...] = (
+    (
+        "markdown formatting present",
+        re.compile(r"\*\*|^#{1,3}\s", re.MULTILINE),
+    ),
+    (
+        "markdown divider lines present",
+        re.compile(r"^\s*[-_=*#]{3,}\s*$", re.MULTILINE),
+    ),
+    (
+        "code fences present",
+        re.compile(r"```"),
+    ),
+    (
+        "placeholder tokens present",
+        re.compile(r"\[[^\]]*(?:your|name|address|phone|email|date|company|recipient)[^\]]*\]", re.IGNORECASE),
+    ),
+    (
+        "preamble present",
+        re.compile(r"^(here is|here's|here are|below is|okay,?|sure,?|certainly|i've drafted|i have drafted)", re.IGNORECASE | re.MULTILINE),
+    ),
+    (
+        "trailing notes/explanation present",
+        re.compile(r"^\s*-?\s*(Note\b|Explanation|Rationale|What I changed|Key changes|Analysis|I'?ve (significantly|enhanced|rewritten|tailored))", re.IGNORECASE | re.MULTILINE),
+    ),
+)
+
 
 def extract_contact_info(text: str) -> set[str]:
     found: set[str] = set()
@@ -44,6 +71,15 @@ def basic_contact_check(output: str, resume_text: str) -> list[str]:
     for keyword in _SUSPICIOUS_KEYWORDS:
         if keyword in lowered:
             flags.append(f"suspicious phrasing '{keyword}'")
+    return flags
+
+
+def format_check(output: str) -> list[str]:
+    """Return flags for markdown/placeholder/preamble artifacts in output."""
+    flags: list[str] = []
+    for reason, pattern in _FORMAT_FLAG_PATTERNS:
+        if pattern.search(output):
+            flags.append(reason)
     return flags
 
 

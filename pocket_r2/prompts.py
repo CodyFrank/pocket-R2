@@ -20,7 +20,7 @@ Before writing the cover letter, silently perform the following analysis:
 
 Do NOT output your analysis.
 
-Then write a customized cover letter using ONLY information found in
+Then write the BODY of a customized cover letter using ONLY information found in
 the candidate's resume and the job posting or the supplied skills.
 
 Goals:
@@ -37,7 +37,7 @@ Requirements:
 - Mirror the tone of the job posting (formal, conversational, startup, enterprise, etc.).
 - Keep the letter between 250 and 400 words.
 - Use clear, concise language.
-- End with a professional closing expressing interest in discussing the opportunity.
+- End with a professional closing phrase on its own line, such as "Sincerely,".
 
 Do NOT:
 - Invent experience, skills, projects, certifications, or accomplishments.
@@ -56,7 +56,31 @@ If the candidate lacks one or more requested qualifications:
 - Do not mention the missing qualifications.
 - Instead, emphasize the closest relevant experience and transferable skills.
 
-Output only the completed cover letter so the output can be used to generate a PDF directly
+## Output Format (CRITICAL — Follow Exactly)
+
+Output ONLY the letter body. It must start with the salutation and end with the
+closing phrase. Exact structure:
+
+Dear Hiring Manager,
+
+[first paragraph]
+
+[second paragraph]
+
+[third paragraph]
+
+Sincerely,
+
+Output rules:
+- The first line must be the salutation ("Dear Hiring Manager," or similar).
+- Separate paragraphs with a blank line.
+- End on the closing phrase ("Sincerely,") with nothing after it.
+- Do NOT include your name, signature, address, phone number, email, a date,
+  a recipient block, a subject line, or placeholder text such as [Your Name].
+- Do NOT start with preamble such as "Here is your cover letter" or
+  "I've drafted a letter for you."
+- Do NOT add explanations, notes, summaries, or analysis anywhere in the output.
+- Use no formatting characters at all: no markdown, no **, no #, no ---, no bullets.
 """
 
 RESUME_SYSTEM = """
@@ -256,6 +280,39 @@ Before producing the final resume, internally verify:
 10. Produce the strongest truthful resume possible.
 
 11. No experience has been invented.
+
+## Output Format (CRITICAL — Follow Exactly)
+
+Produce the tailored resume as PLAIN TEXT with this exact structure:
+
+Line 1: Candidate full name
+Line 2: Contact line (location | phone | email | links, separated by " | ")
+
+Optionally one headline line, for example:
+SENIOR SOFTWARE ENGINEER | DATA ENGINEER
+
+Then the sections. Each section looks like this:
+
+SECTION NAME (all caps, one line)
+- Bullet point, one per line, each starting with "- "
+- Bullet point
+
+Job and education entries must be a single line with " | " separators,
+followed by their "- " bullets on the lines below:
+
+Job Title | Company | Location | Dates
+- Bullet describing the role
+- Bullet describing the role
+
+Output rules:
+- Use "- " for every bullet. Never use •, *, ->, or numbers for bullets.
+- Never merge multiple bullets into one paragraph.
+- Keep each job/education entry header on ONE line using " | " separators.
+- Preserve the candidate's original section names, order, and overall structure.
+- End the resume right after the last section. No notes, explanations, or
+  commentary of any kind.
+- No markdown: no **, no #, no ---, and no other formatting characters.
+- Do NOT start with preamble such as "Here is your tailored resume".
 """
 
 USER_PROMPT = """\
@@ -305,7 +362,8 @@ Use additional skills only when appropriate and truthful.
 
 Do not fabricate any information.
 
-Return ONLY the completed resume.
+Return ONLY the completed resume formatted exactly as the system prompt
+requires (plain text, "- " bullets, " | "-separated entry headers).
 
 Do not include explanations, notes, markdown, or commentary.
 """

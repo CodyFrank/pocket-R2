@@ -11,10 +11,18 @@ import yaml
 
 from pocket_r2 import secrets
 from pocket_r2.llm import generate
+from pocket_r2.normalize import (
+    build_letter_header,
+    compose_cover_letter,
+    detect_company,
+    normalize_cover_body,
+    normalize_resume,
+    parse_contact_from_resume,
+)
 from pocket_r2.pdf import CoverLetterPDF, ResumePDF
 from pocket_r2.prompts import build_cover_letter_messages, build_resume_messages
 from pocket_r2.scraper import get_job_text
-from pocket_r2.validation import basic_contact_check, validate_output
+from pocket_r2.validation import basic_contact_check, format_check, validate_output
 
 DEFAULT_CONFIG_PATH = Path("config.yaml")
 DEFAULT_RESUME_PATH = Path("resume.txt")
@@ -111,18 +119,33 @@ def _timestamped_path(output_dir: Path, prefix: str) -> Path:
     return filepath
 
 
-def save_cover_letter_pdf(text: str, output_dir: Path) -> Path:
+def save_cover_letter_pdf(
+    text: str, output_dir: Path, page_format: str = "Letter"
+) -> Path:
     filepath = _timestamped_path(output_dir, "cover_letter")
-    pdf = CoverLetterPDF()
+    pdf = CoverLetterPDF(page_format=page_format)
     pdf.render(text)
     pdf.output(str(filepath))
     os.chmod(filepath, 0o600)
     return filepath
 
 
-def save_resume_pdf(text: str, output_dir: Path) -> Path:
+def save_composed_cover_letter_pdf(
+    header: dict, body: str, output_dir: Path, page_format: str = "Letter"
+) -> Path:
+    filepath = _timestamped_path(output_dir, "cover_letter")
+    pdf = CoverLetterPDF(page_format=page_format)
+    pdf.render_with_header(header, body)
+    pdf.output(str(filepath))
+    os.chmod(filepath, 0o600)
+    return filepath
+
+
+def save_resume_pdf(
+    text: str, output_dir: Path, page_format: str = "Letter"
+) -> Path:
     filepath = _timestamped_path(output_dir, "resume")
-    pdf = ResumePDF()
+    pdf = ResumePDF(page_format=page_format)
     pdf.render(text)
     pdf.output(str(filepath))
     os.chmod(filepath, 0o600)
@@ -138,6 +161,8 @@ def _draft_flagged(
     host: str | None,
 ) -> bool:
     if basic_contact_check(draft, resume_text):
+        return True
+    if format_check(draft):
         return True
     ok, _ = validate_output(job_text, resume_text, draft, model, provider, host)
     return not ok
@@ -253,6 +278,7 @@ def main(argv: list[str] | None = None) -> None:
     output_dir = Path(config.get("output_dir", "output"))
     resume_output_dir = Path(config.get("resume_output_dir", "output"))
     skills_file = Path(config.get("skills_file", "skills.yaml"))
+    page_format = config.get("pdf_page_size", "Letter")
     allow_private_urls = args.allow_private_urls or config.get("allow_private_urls", False)
     injection_check = not args.no_injection_check and config.get(
         "prompt_injection_check", True
@@ -286,7 +312,7 @@ def main(argv: list[str] | None = None) -> None:
 
     if not args.no_cover_letter:
         print("Generating cover letter...", file=sys.stderr)
-        cover_letter = _generate_safe(
+        cover_body = _generate_safe(
             build_cover_letter_messages,
             job_text,
             resume_text,
@@ -298,12 +324,19 @@ def main(argv: list[str] | None = None) -> None:
             label="cover letter",
         )
 
+        contact = parse_contact_from_resume(resume_text)
+        company = detect_company(job_text, args.url)
+        header = build_letter_header(contact, company)
+        cover_body = normalize_cover_body(cover_body, contact, company)
+
         if args.stdout:
             print("--- Cover Letter ---")
-            print(cover_letter)
+            print(compose_cover_letter(header, cover_body))
             print()
         else:
-            filepath = save_cover_letter_pdf(cover_letter, output_dir)
+            filepath = save_composed_cover_letter_pdf(
+                header, cover_body, output_dir, page_format
+            )
             print(f"Cover letter saved to {filepath}", file=sys.stderr)
 
     if not args.no_resume:
@@ -319,12 +352,15 @@ def main(argv: list[str] | None = None) -> None:
             injection_check=injection_check,
             label="tailored resume",
         )
+        tailored_resume = normalize_resume(tailored_resume)
 
         if args.stdout:
             print("--- Tailored Resume ---")
             print(tailored_resume)
         else:
-            filepath = save_resume_pdf(tailored_resume, resume_output_dir)
+            filepath = save_resume_pdf(
+                tailored_resume, resume_output_dir, page_format
+            )
             print(f"Tailored resume saved to {filepath}", file=sys.stderr)
 
 

@@ -106,11 +106,22 @@ ollama_host: http://localhost:11434
 output_dir: output
 resume_output_dir: output
 skills_file: skills.yaml
+pdf_page_size: Letter
 allow_private_urls: false
 prompt_injection_check: true
 ```
 
+`pdf_page_size` accepts any fpdf2 format name (e.g. `Letter`, `A4`). Letter is the default since most posting sites target US employers.
+
 Generated PDFs and your `resume.txt` are written with `0600` permissions so other local users can't read your personal data.
+
+## Upload-Ready Output
+
+Generated PDFs are cleaned before rendering so they are ready to upload without manual edits:
+
+- The cover letter header (candidate name/contact from `resume.txt`, today's date, and a "Hiring Manager / <company>" recipient block) is auto-filled by the tool. The company name is best-effort (derived from the job URL or posting text); if it can't be determined, the recipient is just "Hiring Manager".
+- Model output is normalized before rendering: preambles, trailing "Explanation"/"Notes" sections, markdown characters, placeholder tokens, and stray tabs/bullet characters are stripped.
+- The format check (markdown, placeholders, preamble, trailing notes) is part of the prompt-injection validation loop, so drafts that violate the format are regenerated once automatically.
 
 ## License
 
